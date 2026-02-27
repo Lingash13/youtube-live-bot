@@ -174,11 +174,11 @@ async def check_youtube():
 
                         live_video_id = None
 
-            await asyncio.sleep(900)
+            await asyncio.sleep(120)
 
         except Exception as e:
             print("ERROR:", e)
-            await asyncio.sleep(900)
+            await asyncio.sleep(120)
 
 
 @client.event
