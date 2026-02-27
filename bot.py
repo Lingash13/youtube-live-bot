@@ -21,7 +21,6 @@ current_live_id = None
 announced_upcoming = None
 
 
-# -------- MAIN CHECK FUNCTION -------- #
 async def check_live():
     global current_live_id
     global announced_upcoming
@@ -30,25 +29,32 @@ async def check_live():
 
     while not client.is_closed():
         try:
-            channel = client.get_channel(DISCORD_CHANNEL_ID)
+            print("Checking YouTube...")
 
-            # ---------------- LIVE CHECK ---------------- #
+            # -------- LIVE CHECK -------- #
             live_request = youtube.search().list(
                 part="snippet",
                 channelId=YOUTUBE_CHANNEL_ID,
                 type="video",
                 eventType="live"
             )
+
             live_response = live_request.execute()
+            print("Live Response:", live_response)
 
             if live_response["items"]:
                 video = live_response["items"][0]
                 video_id = video["id"]["videoId"]
 
+                print("Live detected:", video_id)
+
                 if current_live_id != video_id:
                     current_live_id = video_id
 
                     url = f"https://youtube.com/watch?v={video_id}"
+
+                    channel = await client.fetch_channel(DISCORD_CHANNEL_ID)
+                    print("Sending LIVE message to:", channel)
 
                     embed = discord.Embed(
                         title="🔴 LIVE NOW!",
@@ -64,9 +70,11 @@ async def check_live():
                     await channel.send(embed=embed)
 
             else:
-                # If previously live but not anymore → Live Ended
+                # If was live before and now stopped
                 if current_live_id is not None:
                     ended_url = f"https://youtube.com/watch?v={current_live_id}"
+
+                    channel = await client.fetch_channel(DISCORD_CHANNEL_ID)
 
                     embed = discord.Embed(
                         title="⛔ LIVE ENDED",
@@ -76,17 +84,20 @@ async def check_live():
                     )
 
                     await channel.send(embed=embed)
+                    print("Live ended sent")
 
                     current_live_id = None
 
-            # ---------------- UPCOMING CHECK ---------------- #
+            # -------- UPCOMING CHECK -------- #
             upcoming_request = youtube.search().list(
                 part="snippet",
                 channelId=YOUTUBE_CHANNEL_ID,
                 type="video",
                 eventType="upcoming"
             )
+
             upcoming_response = upcoming_request.execute()
+            print("Upcoming Response:", upcoming_response)
 
             if upcoming_response["items"]:
                 video = upcoming_response["items"][0]
@@ -96,6 +107,8 @@ async def check_live():
                     announced_upcoming = video_id
 
                     url = f"https://youtube.com/watch?v={video_id}"
+
+                    channel = await client.fetch_channel(DISCORD_CHANNEL_ID)
 
                     embed = discord.Embed(
                         title="📅 Scheduled Live!",
@@ -109,20 +122,19 @@ async def check_live():
                     )
 
                     await channel.send(embed=embed)
+                    print("Scheduled live sent")
 
             await asyncio.sleep(120)
 
         except Exception as e:
-            print("Error:", e)
+            print("ERROR OCCURRED:", e)
             await asyncio.sleep(120)
 
 
-# -------- BOT READY EVENT -------- #
 @client.event
 async def on_ready():
     print(f"Bot Online: {client.user}")
     client.loop.create_task(check_live())
 
 
-# -------- RUN BOT -------- #
 client.run(TOKEN)
