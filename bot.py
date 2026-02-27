@@ -3,6 +3,8 @@ import asyncio
 import os
 import feedparser
 import requests
+import re
+import json
 
 TOKEN = os.getenv("DISCORD_TOKEN")
 YOUTUBE_CHANNEL_ID = os.getenv("YOUTUBE_CHANNEL_ID")
@@ -18,12 +20,44 @@ last_video_id = None
 live_video_id = None
 
 
-def is_live(video_url):
+def get_live_status(video_url):
+    """
+    Returns:
+    "live"      -> if currently live
+    "ended"     -> if live ended
+    "upload"    -> normal upload
+    "unknown"   -> fallback
+    """
     try:
         r = requests.get(video_url, timeout=10)
-        return "isLiveNow" in r.text
-    except:
-        return False
+        html = r.text
+
+        match = re.search(r"ytInitialPlayerResponse\s*=\s*(\{.+?\});", html)
+        if not match:
+            return "unknown"
+
+        data = json.loads(match.group(1))
+
+        video_details = data.get("videoDetails", {})
+        microformat = data.get("microformat", {})
+        player_microformat = microformat.get("playerMicroformatRenderer", {})
+
+        is_live = video_details.get("isLiveContent")
+
+        if is_live:
+            live_details = player_microformat.get("liveBroadcastDetails", {})
+
+            if "endTimestamp" in live_details:
+                return "ended"
+
+            if "startTimestamp" in live_details:
+                return "live"
+
+        return "upload"
+
+    except Exception as e:
+        print("Live status error:", e)
+        return "unknown"
 
 
 async def check_youtube():
@@ -46,54 +80,24 @@ async def check_youtube():
 
                 channel = await client.fetch_channel(DISCORD_CHANNEL_ID)
 
-                # NEW VIDEO OR LIVE
+                status = get_live_status(link)
+
+                # NEW VIDEO
                 if last_video_id != video_id:
                     last_video_id = video_id
 
-                    if is_live(link):
+                    if status == "live":
                         live_video_id = video_id
 
                         embed = discord.Embed(
                             title="🔥 🔴 LIVE STREAM STARTED 🔴 🔥",
-                            description=(
-                                f"🎮 **{title}**\n\n"
-                                f"🚀 The battle has begun!\n"
-                                f"💥 Join now and dominate the stream!"
-                            ),
+                            description=f"🎮 **{title}**\n\n🚀 The battle has begun!",
                             color=0xFF0000,
-                            url=link
-                        )
-
-                        embed.set_author(
-                            name="LK GAMING THENI",
-                            icon_url=f"https://img.youtube.com/vi/{video_id}/default.jpg",
                             url=link
                         )
 
                         embed.set_image(
                             url=f"https://img.youtube.com/vi/{video_id}/maxresdefault.jpg"
-                        )
-
-                        embed.set_thumbnail(
-                            url=f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg"
-                        )
-
-                        embed.add_field(
-                            name="⚔ Stream Mode",
-                            value="Live Gameplay",
-                            inline=True
-                        )
-
-                        embed.add_field(
-                            name="📡 Status",
-                            value="🟢 ONLINE",
-                            inline=True
-                        )
-
-                        embed.add_field(
-                            name="🔥 Join Now",
-                            value=f"[Click Here To Watch]({link})",
-                            inline=False
                         )
 
                         embed.set_footer(
@@ -107,40 +111,19 @@ async def check_youtube():
                         else:
                             await channel.send(embed=embed)
 
-                        print("Live notification sent")
+                        print("Live started sent")
 
-                    else:
+                    elif status == "upload":
+
                         embed = discord.Embed(
-                            title="🎬 NEW GAMING VIDEO DROPPED!",
-                            description=(
-                                f"🔥 **{title}**\n\n"
-                                f"🎮 Ready for another epic video?\n"
-                                f"👇 Watch now!"
-                            ),
+                            title="🎬 NEW VIDEO UPLOADED!",
+                            description=f"🔥 **{title}**",
                             color=0x0099FF,
-                            url=link
-                        )
-
-                        embed.set_author(
-                            name="LK GAMING THENI",
-                            icon_url=f"https://img.youtube.com/vi/{video_id}/default.jpg",
                             url=link
                         )
 
                         embed.set_image(
                             url=f"https://img.youtube.com/vi/{video_id}/maxresdefault.jpg"
-                        )
-
-                        embed.add_field(
-                            name="🎯 Category",
-                            value="Gaming",
-                            inline=True
-                        )
-
-                        embed.add_field(
-                            name="📺 Platform",
-                            value="YouTube",
-                            inline=True
                         )
 
                         embed.set_footer(
@@ -150,15 +133,18 @@ async def check_youtube():
                         embed.timestamp = discord.utils.utcnow()
 
                         await channel.send(embed=embed)
-                        print("Upload notification sent")
 
-                # LIVE ENDED CHECK
+                        print("Upload sent")
+
+                # LIVE ENDED
                 if live_video_id:
-                    if not is_live(f"https://youtube.com/watch?v={live_video_id}"):
+                    current_status = get_live_status(f"https://youtube.com/watch?v={live_video_id}")
+
+                    if current_status == "ended":
 
                         embed = discord.Embed(
                             title="⛔ LIVE STREAM ENDED",
-                            description="🎮 The battle has ended.\n\nThanks for watching!",
+                            description="🎮 Stream has ended.\n\nThanks for watching!",
                             color=0x2F3136
                         )
 
@@ -174,7 +160,7 @@ async def check_youtube():
 
                         live_video_id = None
 
-            await asyncio.sleep(120)
+            await asyncio.sleep(120)  # Check every 2 minutes
 
         except Exception as e:
             print("ERROR:", e)
