@@ -97,7 +97,7 @@ async def check_youtube():
                         )
 
                         embed.set_footer(
-                            text="🎮 Developed by LK Gaming | Powered by Railway"
+                            text="🎮 Developed by Lingash | Powered by LL Studio"
                         )
 
                         embed.timestamp = discord.utils.utcnow()
@@ -144,7 +144,7 @@ async def check_youtube():
                         )
 
                         embed.set_footer(
-                            text="🎮 Developed by LK Gaming | Powered by Railway"
+                            text="🎮 Developed by Lingash | Powered by Railway"
                         )
 
                         embed.timestamp = discord.utils.utcnow()
