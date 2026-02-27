@@ -26,8 +26,8 @@ def format_duration(start, end):
         start_dt = datetime.fromisoformat(start.replace("Z", "+00:00"))
         end_dt = datetime.fromisoformat(end.replace("Z", "+00:00"))
         delta = end_dt - start_dt
-
         total_seconds = int(delta.total_seconds())
+
         hours = total_seconds // 3600
         minutes = (total_seconds % 3600) // 60
         seconds = total_seconds % 60
@@ -54,14 +54,13 @@ def get_live_details(video_url):
 
         views = video_details.get("viewCount")
         is_live_content = video_details.get("isLiveContent")
-
         live_details = player_microformat.get("liveBroadcastDetails", {})
 
         if is_live_content:
             if "endTimestamp" in live_details:
                 start = live_details.get("startTimestamp")
                 end = live_details.get("endTimestamp")
-                duration = format_duration(start, end) if start and end else "Unknown"
+                duration = format_duration(start, end)
                 return "ended", duration, views
 
             if "startTimestamp" in live_details:
@@ -84,8 +83,6 @@ async def check_youtube():
 
     while not client.is_closed():
         try:
-            print("Checking RSS...")
-
             feed = feedparser.parse(RSS_URL)
 
             if feed.entries:
@@ -97,85 +94,93 @@ async def check_youtube():
                 channel = await client.fetch_channel(DISCORD_CHANNEL_ID)
                 status, extra_data, views = get_live_details(link)
 
-                # NEW VIDEO
+                # NEW CONTENT DETECTED
                 if last_video_id != video_id:
                     last_video_id = video_id
 
-                    # SCHEDULED
-                    if status == "scheduled":
-                        embed = discord.Embed(
-                            title="🟡 ⏳ LIVE STREAM SCHEDULED ⏳ 🟡",
-                            description=f"🎮 **{title}**\n\n🕒 Starts At: {extra_data}",
-                            color=0xFFA500,
-                            url=link
-                        )
+                    embed = None
 
-                        embed.set_image(
-                            url=f"https://img.youtube.com/vi/{video_id}/maxresdefault.jpg"
-                        )
-
-                        embed.set_footer(text="🎮 Developed by Lingash | Powered by LL Studio")
-                        embed.timestamp = discord.utils.utcnow()
-
-                        if PING_ROLE_ID:
-                            await channel.send(
-                                content=f"<@&{PING_ROLE_ID}>",
-                                embed=embed
-                            )
-                        else:
-                            await channel.send(embed=embed)
-
-                    # LIVE START
-                    elif status == "live":
+                    # 🔴 LIVE
+                    if status == "live":
                         live_video_id = video_id
 
                         embed = discord.Embed(
                             title="🔥 🔴 LIVE STREAM STARTED 🔴 🔥",
-                            description=f"🎮 **{title}**\n\n🚀 The battle has begun!",
+                            description=(
+                                f"🔴 **{title}**\n\n"
+                                "🚀 The battle has begun!\n"
+                                "💥 Join now and dominate the stream!"
+                            ),
                             color=0xFF0000,
                             url=link
                         )
 
-                        embed.set_image(
-                            url=f"https://img.youtube.com/vi/{video_id}/maxresdefault.jpg"
-                        )
+                        embed.add_field(name="⚔ Stream Mode", value="Live Gameplay", inline=False)
+                        embed.add_field(name="📡 Status", value="🟢 ONLINE", inline=False)
+                        embed.add_field(name="👁 Current Views", value=views if views else "Unknown", inline=False)
+                        embed.add_field(name="🔥 Join Now", value=f"[Click Here To Watch]({link})", inline=False)
 
-                        embed.add_field(
-                            name="👁 Current Views",
-                            value=views if views else "Unknown",
-                            inline=True
-                        )
+                    # 🟡 SCHEDULED
+                    elif status == "scheduled":
 
-                        embed.set_footer(text="🎮 Developed by Lingash | Powered by LL Studio")
-                        embed.timestamp = discord.utils.utcnow()
-
-                        if PING_ROLE_ID:
-                            await channel.send(
-                                content=f"<@&{PING_ROLE_ID}>",
-                                embed=embed
-                            )
-                        else:
-                            await channel.send(embed=embed)
-
-                    # NORMAL UPLOAD
-                    else:
                         embed = discord.Embed(
-                            title="🎬 NEW VIDEO UPLOADED!",
-                            description=f"🎮 **{title}**",
+                            title="🟡 ⏳ LIVE STREAM SCHEDULED ⏳ 🟡",
+                            description=(
+                                f"🔴 **{title}**\n\n"
+                                "🚀 Get ready for the battle!\n"
+                                f"🕒 Starts At: {extra_data}"
+                            ),
+                            color=0xFFA500,
+                            url=link
+                        )
+
+                        embed.add_field(name="⚔ Stream Mode", value="Live Gameplay", inline=False)
+                        embed.add_field(name="📡 Status", value="🟡 SCHEDULED", inline=False)
+                        embed.add_field(name="🔔 Reminder", value=f"[Set Reminder]({link})", inline=False)
+
+                    # 🎬 UPLOAD
+                    else:
+
+                        embed = discord.Embed(
+                            title="🎬 🔥 NEW VIDEO DROPPED 🔥 🎬",
+                            description=(
+                                f"🎮 **{title}**\n\n"
+                                "🚀 Ready for another epic ride?\n"
+                                "💥 Watch now!"
+                            ),
                             color=0x0099FF,
                             url=link
                         )
 
-                        embed.set_image(
-                            url=f"https://img.youtube.com/vi/{video_id}/maxresdefault.jpg"
-                        )
+                        embed.add_field(name="📡 Status", value="🎬 UPLOADED", inline=False)
+                        embed.add_field(name="👁 Views", value=views if views else "Unknown", inline=False)
+                        embed.add_field(name="🔥 Watch Now", value=f"[Click Here To Watch]({link})", inline=False)
 
-                        embed.set_footer(text="🎮 Developed by Lingash | Powered by LL Studio")
-                        embed.timestamp = discord.utils.utcnow()
+                    embed.set_author(
+                        name="LK GAMING THENI",
+                        icon_url=f"https://img.youtube.com/vi/{video_id}/default.jpg"
+                    )
 
+                    embed.set_thumbnail(
+                        url=f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg"
+                    )
+
+                    embed.set_image(
+                        url=f"https://img.youtube.com/vi/{video_id}/maxresdefault.jpg"
+                    )
+
+                    embed.set_footer(
+                        text="🎮 Developed by Lingash | Powered by LL Studio"
+                    )
+
+                    embed.timestamp = discord.utils.utcnow()
+
+                    if PING_ROLE_ID:
+                        await channel.send(content=f"<@&{PING_ROLE_ID}>", embed=embed)
+                    else:
                         await channel.send(embed=embed)
 
-                # LIVE ENDED
+                # ⛔ LIVE ENDED
                 if live_video_id:
                     current_status, duration, views = get_live_details(
                         f"https://youtube.com/watch?v={live_video_id}"
@@ -184,40 +189,45 @@ async def check_youtube():
                     if current_status == "ended":
                         embed = discord.Embed(
                             title="⛔ 🔴 LIVE STREAM ENDED 🔴 ⛔",
-                            description="🎮 Thanks for watching!",
+                            description=(
+                                "🎮 The battle has ended!\n\n"
+                                "🙏 Thanks everyone for joining.\n"
+                                "🔥 Stay tuned for next stream!"
+                            ),
                             color=0x2F3136
+                        )
+
+                        embed.add_field(name="⚔ Stream Mode", value="Live Gameplay", inline=False)
+                        embed.add_field(name="📡 Status", value="🔴 OFFLINE", inline=False)
+                        embed.add_field(name="⏱ Duration", value=duration if duration else "Unknown", inline=False)
+                        embed.add_field(name="👁 Total Views", value=views if views else "Unknown", inline=False)
+                        embed.add_field(
+                            name="📺 Replay",
+                            value=f"[Watch Replay](https://youtube.com/watch?v={live_video_id})",
+                            inline=False
+                        )
+
+                        embed.set_author(
+                            name="LK GAMING THENI",
+                            icon_url=f"https://img.youtube.com/vi/{live_video_id}/default.jpg"
+                        )
+
+                        embed.set_thumbnail(
+                            url=f"https://img.youtube.com/vi/{live_video_id}/hqdefault.jpg"
                         )
 
                         embed.set_image(
                             url=f"https://img.youtube.com/vi/{live_video_id}/maxresdefault.jpg"
                         )
 
-                        embed.add_field(
-                            name="⏱ Duration",
-                            value=duration if duration else "Unknown",
-                            inline=True
+                        embed.set_footer(
+                            text="🎮 Developed by Lingash | Powered by LL Studio"
                         )
 
-                        embed.add_field(
-                            name="👁 Total Views",
-                            value=views if views else "Unknown",
-                            inline=True
-                        )
-
-                        embed.add_field(
-                            name="📺 Replay",
-                            value=f"https://youtube.com/watch?v={live_video_id}",
-                            inline=False
-                        )
-
-                        embed.set_footer(text="🎮 Developed by Lingash | Powered by LL Studio")
                         embed.timestamp = discord.utils.utcnow()
 
                         if PING_ROLE_ID:
-                            await channel.send(
-                                content=f"<@&{PING_ROLE_ID}>",
-                                embed=embed
-                            )
+                            await channel.send(content=f"<@&{PING_ROLE_ID}>", embed=embed)
                         else:
                             await channel.send(embed=embed)
 
