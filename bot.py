@@ -126,7 +126,7 @@ async def check_live():
                     await channel.send(embed=embed)
                     print("Scheduled live sent")
 
-            await asyncio.sleep(120)
+            await asyncio.sleep(600)
 
         except Exception as e:
             print("ERROR OCCURRED:", e)
