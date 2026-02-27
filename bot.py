@@ -82,7 +82,9 @@ async def check_live():
                         color=discord.Color.dark_gray(),
                         url=ended_url
                     )
-
+                    embed.set_image(
+                        url=video["snippet"]["thumbnails"]["high"]["url"]
+                    )
                     await channel.send(embed=embed)
                     print("Live ended sent")
 
