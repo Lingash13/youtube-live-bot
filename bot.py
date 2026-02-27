@@ -21,20 +21,13 @@ live_video_id = None
 
 
 def get_live_status(video_url):
-    """
-    Returns:
-    "live"      -> if currently live
-    "ended"     -> if live ended
-    "upload"    -> normal upload
-    "unknown"   -> fallback
-    """
     try:
         r = requests.get(video_url, timeout=10)
         html = r.text
 
         match = re.search(r"ytInitialPlayerResponse\s*=\s*(\{.+?\});", html)
         if not match:
-            return "unknown"
+            return "upload", None
 
         data = json.loads(match.group(1))
 
@@ -42,22 +35,24 @@ def get_live_status(video_url):
         microformat = data.get("microformat", {})
         player_microformat = microformat.get("playerMicroformatRenderer", {})
 
-        is_live = video_details.get("isLiveContent")
+        is_live_content = video_details.get("isLiveContent")
 
-        if is_live:
+        if is_live_content:
             live_details = player_microformat.get("liveBroadcastDetails", {})
 
             if "endTimestamp" in live_details:
-                return "ended"
+                return "ended", None
 
             if "startTimestamp" in live_details:
-                return "live"
+                return "live", live_details.get("startTimestamp")
 
-        return "upload"
+            if "scheduledStartTimestamp" in live_details:
+                return "scheduled", live_details.get("scheduledStartTimestamp")
 
-    except Exception as e:
-        print("Live status error:", e)
-        return "unknown"
+        return "upload", None
+
+    except:
+        return "upload", None
 
 
 async def check_youtube():
@@ -79,31 +74,81 @@ async def check_youtube():
                 link = latest.link
 
                 channel = await client.fetch_channel(DISCORD_CHANNEL_ID)
-
-                status = get_live_status(link)
+                status, start_time = get_live_status(link)
 
                 # NEW VIDEO
                 if last_video_id != video_id:
                     last_video_id = video_id
 
-                    if status == "live":
-                        live_video_id = video_id
-
+                    # 🟡 SCHEDULED
+                    if status == "scheduled":
                         embed = discord.Embed(
-                            title="🔥 🔴 LIVE STREAM STARTED 🔴 🔥",
-                            description=f"🎮 **{title}**\n\n🚀 The battle has begun!",
-                            color=0xFF0000,
+                            title="🟡 ⏳ LIVE STREAM SCHEDULED ⏳ 🟡",
+                            description=(
+                                f"🎮 **{title}**\n\n"
+                                f"🚀 Get ready for the battle!\n"
+                                f"🕒 Starts At: {start_time}"
+                            ),
+                            color=0xFFA500,
                             url=link
+                        )
+
+                        embed.set_author(
+                            name="LK GAMING THENI",
+                            icon_url=f"https://img.youtube.com/vi/{video_id}/default.jpg"
+                        )
+
+                        embed.set_thumbnail(
+                            url=f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg"
                         )
 
                         embed.set_image(
                             url=f"https://img.youtube.com/vi/{video_id}/maxresdefault.jpg"
                         )
 
-                        embed.set_footer(
-                            text="🎮 Developed by Lingash | Powered by LL Studio"
+                        embed.add_field(name="⚔ Stream Mode", value="Live Gameplay", inline=False)
+                        embed.add_field(name="📡 Status", value="🟡 SCHEDULED", inline=False)
+                        embed.add_field(name="🔔 Reminder", value=f"[Set Reminder]({link})", inline=False)
+
+                        embed.set_footer(text="🎮 Developed by Lingash | Powered by LL Studio")
+                        embed.timestamp = discord.utils.utcnow()
+
+                        await channel.send(embed=embed)
+                        print("Scheduled sent")
+
+                    # 🔴 LIVE START
+                    elif status == "live":
+                        live_video_id = video_id
+
+                        embed = discord.Embed(
+                            title="🔥 🔴 LIVE STREAM STARTED 🔴 🔥",
+                            description=(
+                                f"🎮 🔴 **{title}**\n\n"
+                                f"🚀 The battle has begun!\n"
+                                f"💥 Join now and dominate the stream!"
+                            ),
+                            color=0xFF0000,
+                            url=link
                         )
 
+                        embed.set_author(
+                            name="LK GAMING THENI",
+                            icon_url=f"https://img.youtube.com/vi/{video_id}/default.jpg"
+                        )
+
+                        embed.set_thumbnail(
+                            url=f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg"
+                        )
+
+                        embed.set_image(
+                            url=f"https://img.youtube.com/vi/{video_id}/maxresdefault.jpg"
+                        )
+
+                        embed.add_field(name="⚔ Stream Mode", value="Live Gameplay", inline=False)
+                        embed.add_field(name="📡 Status", value="🟢 ONLINE", inline=False)
+                        embed.add_field(name="🔥 Join Now", value=f"[Click Here To Watch]({link})", inline=False)
+
+                        embed.set_footer(text="🎮 Developed by Lingash | Powered by LL Studio")
                         embed.timestamp = discord.utils.utcnow()
 
                         if PING_ROLE_ID:
@@ -113,54 +158,79 @@ async def check_youtube():
 
                         print("Live started sent")
 
-                    elif status == "upload":
-
+                    # 🎬 NORMAL UPLOAD
+                    else:
                         embed = discord.Embed(
-                            title="🎬 NEW VIDEO UPLOADED!",
+                            title="🎬 NEW GAMING VIDEO DROPPED!",
                             description=f"🔥 **{title}**",
                             color=0x0099FF,
                             url=link
+                        )
+
+                        embed.set_author(
+                            name="LK GAMING THENI",
+                            icon_url=f"https://img.youtube.com/vi/{video_id}/default.jpg"
+                        )
+
+                        embed.set_thumbnail(
+                            url=f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg"
                         )
 
                         embed.set_image(
                             url=f"https://img.youtube.com/vi/{video_id}/maxresdefault.jpg"
                         )
 
-                        embed.set_footer(
-                            text="🎮 Developed by Lingash | Powered by LL Studio"
-                        )
-
+                        embed.set_footer(text="🎮 Developed by Lingash | Powered by LL Studio")
                         embed.timestamp = discord.utils.utcnow()
 
                         await channel.send(embed=embed)
-
                         print("Upload sent")
 
-                # LIVE ENDED
+                # 🔴 LIVE ENDED
                 if live_video_id:
-                    current_status = get_live_status(f"https://youtube.com/watch?v={live_video_id}")
+                    current_status, _ = get_live_status(f"https://youtube.com/watch?v={live_video_id}")
 
                     if current_status == "ended":
-
                         embed = discord.Embed(
-                            title="⛔ LIVE STREAM ENDED",
-                            description="🎮 Stream has ended.\n\nThanks for watching!",
+                            title="⛔ 🔴 LIVE STREAM ENDED 🔴 ⛔",
+                            description=(
+                                "🎮 The battle has ended!\n\n"
+                                "🙏 Thanks everyone for joining.\n"
+                                "🔥 Stay tuned for next stream!"
+                            ),
                             color=0x2F3136
                         )
 
-                        embed.set_footer(
-                            text="🎮 Developed by Lingash | Powered by LL Studio"
+                        embed.set_author(
+                            name="LK GAMING THENI",
+                            icon_url=f"https://img.youtube.com/vi/{live_video_id}/default.jpg"
                         )
 
+                        embed.set_thumbnail(
+                            url=f"https://img.youtube.com/vi/{live_video_id}/hqdefault.jpg"
+                        )
+
+                        embed.set_image(
+                            url=f"https://img.youtube.com/vi/{live_video_id}/maxresdefault.jpg"
+                        )
+
+                        embed.add_field(name="⚔ Stream Mode", value="Live Gameplay", inline=False)
+                        embed.add_field(name="📡 Status", value="🔴 OFFLINE", inline=False)
+                        embed.add_field(
+                            name="📺 Replay",
+                            value=f"[Watch Replay](https://youtube.com/watch?v={live_video_id})",
+                            inline=False
+                        )
+
+                        embed.set_footer(text="🎮 Developed by Lingash | Powered by LL Studio")
                         embed.timestamp = discord.utils.utcnow()
 
                         await channel.send(embed=embed)
 
+                        live_video_id = None
                         print("Live ended sent")
 
-                        live_video_id = None
-
-            await asyncio.sleep(120)  # Check every 2 minutes
+            await asyncio.sleep(120)
 
         except Exception as e:
             print("ERROR:", e)
