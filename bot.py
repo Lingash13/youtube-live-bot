@@ -46,7 +46,7 @@ async def check_youtube():
 
                 channel = await client.fetch_channel(DISCORD_CHANNEL_ID)
 
-                # 🔥 NEW VIDEO OR LIVE DETECTED
+                # NEW VIDEO OR LIVE
                 if last_video_id != video_id:
                     last_video_id = video_id
 
@@ -152,7 +152,7 @@ async def check_youtube():
                         await channel.send(embed=embed)
                         print("Upload notification sent")
 
-                # 🔴 LIVE ENDED CHECK
+                # LIVE ENDED CHECK
                 if live_video_id:
                     if not is_live(f"https://youtube.com/watch?v={live_video_id}"):
 
@@ -174,20 +174,11 @@ async def check_youtube():
 
                         live_video_id = None
 
-            await asyncio.sleep(900)  # 15 minutes
+            await asyncio.sleep(900)
 
         except Exception as e:
             print("ERROR:", e)
             await asyncio.sleep(900)
-
-
-@client.event
-async def on_ready():
-    print(f"Bot Online: {client.user}")
-    client.loop.create_task(check_youtube())
-
-
-client.run(TOKEN)            await asyncio.sleep(900)
 
 
 @client.event
