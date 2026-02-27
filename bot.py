@@ -77,7 +77,7 @@ async def check_live():
                     channel = await client.fetch_channel(DISCORD_CHANNEL_ID)
 
                     embed = discord.Embed(
-                        title="⛔ LIVE ENDED",
+                        title="⛔LK Gaming Theni LIVE WENT OFFLINE, THANK FOR JOINING WITH US",
                         description="The live stream has ended.",
                         color=discord.Color.dark_gray(),
                         url=ended_url
