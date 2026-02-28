@@ -2,7 +2,6 @@ import discord
 import asyncio
 import os
 import feedparser
-import requests
 
 TOKEN = os.getenv("DISCORD_TOKEN")
 YOUTUBE_CHANNEL_ID = os.getenv("YOUTUBE_CHANNEL_ID")
@@ -18,46 +17,6 @@ last_video_id = None
 live_video_id = None
 
 
-# ------------------------------------------------
-# 🔴 LIVE CHECK (Railway Stable - With Headers)
-# ------------------------------------------------
-def check_if_live(channel_id):
-    try:
-        url = f"https://www.youtube.com/channel/{channel_id}/live"
-
-        headers = {
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/120.0.0.0 Safari/537.36"
-            ),
-            "Accept-Language": "en-US,en;q=0.9"
-        }
-
-        r = requests.get(
-            url,
-            headers=headers,
-            allow_redirects=True,
-            timeout=10
-        )
-
-        print("Requested URL:", url)
-        print("Final URL:", r.url)
-
-        if "/watch?v=" in r.url:
-            video_id = r.url.split("v=")[1].split("&")[0]
-            return True, video_id
-
-        return False, None
-
-    except Exception as e:
-        print("Live check error:", e)
-        return False, None
-
-
-# ------------------------------------------------
-# MAIN LOOP
-# ------------------------------------------------
 async def check_youtube():
     global last_video_id
     global live_video_id
@@ -66,87 +25,96 @@ async def check_youtube():
 
     while not client.is_closed():
         try:
-            print("Checking YouTube status...")
+            print("Checking RSS...")
 
             channel = await client.fetch_channel(DISCORD_CHANNEL_ID)
 
-            # -----------------------------
-            # 🔴 LIVE CHECK
-            # -----------------------------
-            is_live, current_live_id = check_if_live(YOUTUBE_CHANNEL_ID)
-
-            print("Is Live:", is_live)
-            print("Current Live ID:", current_live_id)
-
-            # LIVE START
-            if is_live and live_video_id != current_live_id:
-                live_video_id = current_live_id
-                link = f"https://youtube.com/watch?v={current_live_id}"
-
-                embed = discord.Embed(
-                    title="🔥 🔴 LIVE STREAM STARTED 🔴 🔥",
-                    description="🚀 The battle has begun!\n💥 Join now and dominate the stream!",
-                    color=0xFF0000,
-                    url=link
-                )
-
-                embed.add_field(name="📡 Status", value="🟢 ONLINE", inline=False)
-                embed.add_field(name="🔥 Join Now", value=f"[Click Here To Watch]({link})", inline=False)
-
-                embed.set_image(
-                    url=f"https://img.youtube.com/vi/{current_live_id}/maxresdefault.jpg"
-                )
-
-                embed.set_footer(text="🎮 Developed by Lingash | Powered by LL Studio")
-                embed.timestamp = discord.utils.utcnow()
-
-                if PING_ROLE_ID:
-                    await channel.send(content=f"<@&{PING_ROLE_ID}>", embed=embed)
-                else:
-                    await channel.send(embed=embed)
-
-                print("Live started notification sent")
-
-            # LIVE ENDED
-            if not is_live and live_video_id:
-                embed = discord.Embed(
-                    title="⛔ 🔴 LIVE STREAM ENDED 🔴 ⛔",
-                    description="🎮 Thanks for watching!",
-                    color=0x2F3136
-                )
-
-                embed.add_field(name="📡 Status", value="🔴 OFFLINE", inline=False)
-                embed.add_field(
-                    name="📺 Replay",
-                    value=f"https://youtube.com/watch?v={live_video_id}",
-                    inline=False
-                )
-
-                embed.set_image(
-                    url=f"https://img.youtube.com/vi/{live_video_id}/maxresdefault.jpg"
-                )
-
-                embed.set_footer(text="🎮 Developed by Lingash | Powered by LL Studio")
-                embed.timestamp = discord.utils.utcnow()
-
-                if PING_ROLE_ID:
-                    await channel.send(content=f"<@&{PING_ROLE_ID}>", embed=embed)
-                else:
-                    await channel.send(embed=embed)
-
-                print("Live ended notification sent")
-                live_video_id = None
-
-            # -----------------------------
-            # 🎬 UPLOAD CHECK (RSS)
-            # -----------------------------
             feed = feedparser.parse(RSS_URL)
 
-            if feed.entries:
-                latest = feed.entries[0]
-                video_id = latest.yt_videoid
-                title = latest.title
-                link = latest.link
+            if not feed.entries:
+                print("No entries found")
+                await asyncio.sleep(30)
+                continue
+
+            latest = feed.entries[0]
+            video_id = latest.yt_videoid
+            title = latest.title
+            link = latest.link
+
+            # 🔴 Detect type
+            broadcast_type = latest.get("yt_livebroadcastcontent", "none")
+
+            print("Video ID:", video_id)
+            print("Broadcast Type:", broadcast_type)
+
+            # ----------------------
+            # 🔴 LIVE START
+            # ----------------------
+            if broadcast_type == "live":
+
+                if live_video_id != video_id:
+                    live_video_id = video_id
+
+                    embed = discord.Embed(
+                        title="🔥 🔴 LIVE STREAM STARTED 🔴 🔥",
+                        description=f"🎮 **{title}**\n\n🚀 Join now and dominate the stream!",
+                        color=0xFF0000,
+                        url=link
+                    )
+
+                    embed.add_field(name="📡 Status", value="🟢 ONLINE", inline=False)
+                    embed.add_field(name="🔥 Join Now", value=f"[Click Here To Watch]({link})", inline=False)
+
+                    embed.set_image(
+                        url=f"https://img.youtube.com/vi/{video_id}/maxresdefault.jpg"
+                    )
+
+                    embed.set_footer(text="🎮 Developed by Lingash | Powered by LL Studio")
+                    embed.timestamp = discord.utils.utcnow()
+
+                    if PING_ROLE_ID:
+                        await channel.send(content=f"<@&{PING_ROLE_ID}>", embed=embed)
+                    else:
+                        await channel.send(embed=embed)
+
+                    print("Live started sent")
+
+            # ----------------------
+            # 🟡 SCHEDULED
+            # ----------------------
+            elif broadcast_type == "upcoming":
+
+                if last_video_id != video_id:
+                    last_video_id = video_id
+
+                    embed = discord.Embed(
+                        title="🟡 🔔 LIVE STREAM SCHEDULED 🔔 🟡",
+                        description=f"🎮 **{title}**",
+                        color=0xFFA500,
+                        url=link
+                    )
+
+                    embed.add_field(name="📡 Status", value="🟡 SCHEDULED", inline=False)
+                    embed.add_field(name="🔔 Reminder", value=f"[Set Reminder]({link})", inline=False)
+
+                    embed.set_image(
+                        url=f"https://img.youtube.com/vi/{video_id}/maxresdefault.jpg"
+                    )
+
+                    embed.set_footer(text="🎮 Developed by Lingash | Powered by LL Studio")
+                    embed.timestamp = discord.utils.utcnow()
+
+                    if PING_ROLE_ID:
+                        await channel.send(content=f"<@&{PING_ROLE_ID}>", embed=embed)
+                    else:
+                        await channel.send(embed=embed)
+
+                    print("Scheduled live sent")
+
+            # ----------------------
+            # 🎬 NORMAL UPLOAD
+            # ----------------------
+            else:
 
                 if last_video_id != video_id:
                     last_video_id = video_id
@@ -173,9 +141,42 @@ async def check_youtube():
                     else:
                         await channel.send(embed=embed)
 
-                    print("Upload notification sent")
+                    print("Upload sent")
 
-            print("Sleeping 30 seconds...")
+            # ----------------------
+            # 🔴 LIVE END CHECK
+            # ----------------------
+            if live_video_id and broadcast_type != "live":
+                print("Live ended detected")
+
+                embed = discord.Embed(
+                    title="⛔ 🔴 LIVE STREAM ENDED 🔴 ⛔",
+                    description="🎮 Thanks for watching!",
+                    color=0x2F3136
+                )
+
+                embed.add_field(name="📡 Status", value="🔴 OFFLINE", inline=False)
+                embed.add_field(
+                    name="📺 Replay",
+                    value=f"https://youtube.com/watch?v={live_video_id}",
+                    inline=False
+                )
+
+                embed.set_image(
+                    url=f"https://img.youtube.com/vi/{live_video_id}/maxresdefault.jpg"
+                )
+
+                embed.set_footer(text="🎮 Developed by Lingash | Powered by LL Studio")
+                embed.timestamp = discord.utils.utcnow()
+
+                if PING_ROLE_ID:
+                    await channel.send(content=f"<@&{PING_ROLE_ID}>", embed=embed)
+                else:
+                    await channel.send(embed=embed)
+
+                live_video_id = None
+
+            print("Sleeping 30 seconds...\n")
             await asyncio.sleep(30)
 
         except Exception as e:
