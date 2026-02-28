@@ -2,10 +2,9 @@ import os
 import discord
 from discord.ext import tasks
 from googleapiclient.discovery import build
-from googleapiclient.errors import HttpError
 
 # ===============================
-# ENV VARIABLES (Railway Settings)
+# ENV VARIABLES (Railway)
 # ===============================
 
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
@@ -21,16 +20,16 @@ intents = discord.Intents.default()
 client = discord.Client(intents=intents)
 
 # ===============================
-# YOUTUBE API SETUP
+# YOUTUBE SETUP
 # ===============================
 
 youtube = build("youtube", "v3", developerKey=YOUTUBE_API_KEY)
 
-last_status = None  # Track live status
+last_status = None
 
 
 # ===============================
-# BACKGROUND LIVE CHECK (LOW QUOTA)
+# LIVE CHECK LOOP (LOW QUOTA)
 # ===============================
 
 @tasks.loop(minutes=10)
@@ -38,48 +37,62 @@ async def check_live_stream():
     global last_status
 
     try:
-        request = youtube.search().list(
-            part="snippet",
-            channelId=CHANNEL_ID,
-            eventType="live",
-            type="video"
-        )
-
-        response = request.execute()
-
         channel = client.get_channel(DISCORD_CHANNEL_ID)
-
         if not channel:
-            print("❌ Discord channel not found.")
+            print("❌ Discord channel not found")
             return
 
+        # 1️⃣ Get uploads playlist ID (cost 1 unit)
+        channel_response = youtube.channels().list(
+            part="contentDetails",
+            id=CHANNEL_ID
+        ).execute()
+
+        uploads_playlist_id = channel_response["items"][0]["contentDetails"]["relatedPlaylists"]["uploads"]
+
+        # 2️⃣ Get latest uploaded video (cost 1 unit)
+        playlist_response = youtube.playlistItems().list(
+            part="snippet",
+            playlistId=uploads_playlist_id,
+            maxResults=1
+        ).execute()
+
+        latest_video = playlist_response["items"][0]
+        video_id = latest_video["snippet"]["resourceId"]["videoId"]
+
+        # 3️⃣ Check if video is live (cost 1 unit)
+        video_response = youtube.videos().list(
+            part="snippet,liveStreamingDetails",
+            id=video_id
+        ).execute()
+
+        video_data = video_response["items"][0]
+        live_details = video_data.get("liveStreamingDetails")
+
         # ===============================
-        # IF LIVE STREAM FOUND
+        # IF STREAM IS LIVE
         # ===============================
-        if response.get("items"):
-            video = response["items"][0]
-            video_id = video["id"]["videoId"]
-            title = video["snippet"]["title"]
-            thumbnail = video["snippet"]["thumbnails"]["high"]["url"]
-            url = f"https://www.youtube.com/watch?v={video_id}"
+        if live_details and "actualStartTime" in live_details and "actualEndTime" not in live_details:
 
             if last_status != "live":
                 last_status = "live"
 
+                title = video_data["snippet"]["title"]
+                thumbnail = video_data["snippet"]["thumbnails"]["high"]["url"]
+                url = f"https://www.youtube.com/watch?v={video_id}"
+
                 embed = discord.Embed(
                     title="🔥 LIVE STREAM STARTED 🔴",
-                    description=f"🚀 **{title}**\n\nClick below to watch now!",
+                    description=f"**{title}**",
                     color=discord.Color.red()
                 )
 
                 embed.set_image(url=thumbnail)
-                embed.add_field(name="📡 Status", value="🟢 ONLINE", inline=True)
-                embed.add_field(name="🎮 Stream Mode", value="Live Gameplay", inline=True)
-                embed.add_field(name="🔥 Watch Now", value=f"[Click Here]({url})", inline=False)
-                embed.set_footer(text="LK Gaming Theni | Powered by LL Studio")
+                embed.add_field(name="📺 Watch Now", value=f"[Click Here]({url})", inline=False)
+                embed.set_footer(text="YouTube Live Alert Bot")
 
                 await channel.send(embed=embed)
-                print("✅ Live stream notification sent.")
+                print("✅ Live notification sent")
 
         # ===============================
         # IF STREAM ENDED
@@ -87,26 +100,15 @@ async def check_live_stream():
         else:
             if last_status == "live":
                 last_status = "ended"
+                await channel.send("📴 Live stream ended.")
+                print("🔔 Live ended message sent")
 
-                embed = discord.Embed(
-                    title="📴 LIVE STREAM ENDED",
-                    description="Thanks for watching ❤️\nSee you in the next stream!",
-                    color=discord.Color.greyple()
-                )
-
-                embed.set_footer(text="LK Gaming Theni")
-
-                await channel.send(embed=embed)
-                print("🔔 Live ended notification sent.")
-
-    except HttpError as e:
-        print("YouTube API Error:", e)
     except Exception as e:
-        print("General Error:", e)
+        print("❌ Error:", e)
 
 
 # ===============================
-# BOT READY EVENT
+# BOT READY
 # ===============================
 
 @client.event
