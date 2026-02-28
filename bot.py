@@ -119,4 +119,4 @@ async def on_ready():
     client.loop.create_task(check_live())
 
 
-client.run(TOKEN
+client.run(TOKEN)
