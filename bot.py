@@ -17,7 +17,7 @@ scheduled_video_id = None
 
 
 # ------------------------------------------------
-# 🔴 LIVE DETECTION
+# 🔴 LIVE DETECTION (Accurate)
 # ------------------------------------------------
 def get_live_video(channel_id):
     try:
@@ -31,10 +31,14 @@ def get_live_video(channel_id):
         r = requests.get(url, headers=headers, timeout=10)
         html = r.text
 
-        if "LIVE" in html:
-            match = re.search(r"watch\?v=([a-zA-Z0-9_-]{11})", html)
-            if match:
-                return True, match.group(1)
+        # Extract ONLY videoId with LIVE badge
+        live_blocks = re.findall(
+            r'"videoId":"(.*?)".*?"badgeRenderer":\{"label":"LIVE"',
+            html
+        )
+
+        if live_blocks:
+            return True, live_blocks[0]
 
         return False, None
 
@@ -44,7 +48,7 @@ def get_live_video(channel_id):
 
 
 # ------------------------------------------------
-# 🟡 SCHEDULED DETECTION
+# 🟡 SCHEDULED DETECTION (Accurate)
 # ------------------------------------------------
 def get_scheduled_live(channel_id):
     try:
@@ -58,10 +62,14 @@ def get_scheduled_live(channel_id):
         r = requests.get(url, headers=headers, timeout=10)
         html = r.text
 
-        if "upcomingEventData" in html or "Scheduled" in html:
-            match = re.search(r"watch\?v=([a-zA-Z0-9_-]{11})", html)
-            if match:
-                return True, match.group(1)
+        # Extract ONLY upcoming event videoId
+        upcoming_blocks = re.findall(
+            r'"videoId":"(.*?)".*?"upcomingEventData"',
+            html
+        )
+
+        if upcoming_blocks:
+            return True, upcoming_blocks[0]
 
         return False, None
 
@@ -199,6 +207,7 @@ async def check_status():
                     await channel.send(embed=embed)
 
                 print("Live ended notification sent")
+
                 live_video_id = None
                 scheduled_video_id = None
 
