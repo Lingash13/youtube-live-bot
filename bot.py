@@ -4,8 +4,7 @@ import os
 import requests
 
 TOKEN = os.getenv("DISCORD_TOKEN")
-YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
-CHANNEL_ID = os.getenv("YOUTUBE_CHANNEL_ID")
+YOUTUBE_CHANNEL_ID = os.getenv("YOUTUBE_CHANNEL_ID")
 DISCORD_CHANNEL_ID = int(os.getenv("DISCORD_CHANNEL_ID"))
 PING_ROLE_ID = os.getenv("PING_ROLE_ID")
 
@@ -13,50 +12,37 @@ intents = discord.Intents.default()
 client = discord.Client(intents=intents)
 
 live_video_id = None
-scheduled_video_id = None
 
 
 # ------------------------------------------------
-# 🔎 GET CHANNEL LIVE / SCHEDULED STATUS
+# 🔴 LIVE CHECK USING REDIRECT (Most Reliable)
 # ------------------------------------------------
-def get_channel_status():
+def check_live(channel_id):
     try:
-        url = (
-            "https://www.googleapis.com/youtube/v3/search"
-            f"?part=snippet"
-            f"&channelId={CHANNEL_ID}"
-            f"&eventType=live"
-            f"&type=video"
-            f"&key={YOUTUBE_API_KEY}"
+        url = f"https://www.youtube.com/channel/{channel_id}/live"
+
+        headers = {
+            "User-Agent": "Mozilla/5.0",
+            "Accept-Language": "en-US,en;q=0.9"
+        }
+
+        response = requests.get(
+            url,
+            headers=headers,
+            allow_redirects=True,
+            timeout=10
         )
 
-        live_response = requests.get(url).json()
+        # If live, YouTube redirects to /watch?v=VIDEO_ID
+        if "/watch?v=" in response.url:
+            video_id = response.url.split("watch?v=")[1].split("&")[0]
+            return True, video_id
 
-        if live_response.get("items"):
-            video_id = live_response["items"][0]["id"]["videoId"]
-            return "live", video_id
-
-        # Check scheduled
-        url_upcoming = (
-            "https://www.googleapis.com/youtube/v3/search"
-            f"?part=snippet"
-            f"&channelId={CHANNEL_ID}"
-            f"&eventType=upcoming"
-            f"&type=video"
-            f"&key={YOUTUBE_API_KEY}"
-        )
-
-        upcoming_response = requests.get(url_upcoming).json()
-
-        if upcoming_response.get("items"):
-            video_id = upcoming_response["items"][0]["id"]["videoId"]
-            return "scheduled", video_id
-
-        return "offline", None
+        return False, None
 
     except Exception as e:
-        print("API Error:", e)
-        return "offline", None
+        print("Live check error:", e)
+        return False, None
 
 
 # ------------------------------------------------
@@ -64,27 +50,24 @@ def get_channel_status():
 # ------------------------------------------------
 async def check_status():
     global live_video_id
-    global scheduled_video_id
 
     await client.wait_until_ready()
 
     while not client.is_closed():
         try:
-            print("Checking YouTube API status...")
+            print("Checking live status...")
 
             channel = await client.fetch_channel(DISCORD_CHANNEL_ID)
 
-            status, video_id = get_channel_status()
+            is_live, video_id = check_live(YOUTUBE_CHANNEL_ID)
 
-            print("Status:", status)
+            print("Is Live:", is_live)
 
             # -----------------------------
             # 🔴 LIVE START
             # -----------------------------
-            if status == "live" and live_video_id != video_id:
+            if is_live and live_video_id != video_id:
                 live_video_id = video_id
-                scheduled_video_id = None
-
                 link = f"https://youtube.com/watch?v={video_id}"
 
                 embed = discord.Embed(
@@ -95,6 +78,7 @@ async def check_status():
                 )
 
                 embed.set_author(name="LK GAMING THENI")
+
                 embed.add_field(name="🛰 Status", value="🟢 ONLINE", inline=False)
                 embed.add_field(name="🔥 Join Now", value=f"[Click Here To Watch]({link})", inline=False)
 
@@ -112,51 +96,20 @@ async def check_status():
                 print("Live notification sent")
 
             # -----------------------------
-            # 🟡 SCHEDULED
-            # -----------------------------
-            elif status == "scheduled" and scheduled_video_id != video_id:
-                scheduled_video_id = video_id
-
-                link = f"https://youtube.com/watch?v={video_id}"
-
-                embed = discord.Embed(
-                    title="🟡 🔔 LIVE STREAM SCHEDULED 🔔 🟡",
-                    description="⏰ Stream will begin soon!\n🔥 Get ready!",
-                    color=0xFFA500,
-                    url=link
-                )
-
-                embed.set_author(name="LK GAMING THENI")
-                embed.add_field(name="🛰 Status", value="🟡 SCHEDULED", inline=False)
-                embed.add_field(name="🔔 Reminder", value=f"[Set Reminder Here]({link})", inline=False)
-
-                embed.set_image(url=f"https://img.youtube.com/vi/{video_id}/maxresdefault.jpg")
-                embed.set_thumbnail(url=f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg")
-
-                embed.set_footer(text="🎮 Developed by Lingash | Powered by LL Studio")
-                embed.timestamp = discord.utils.utcnow()
-
-                if PING_ROLE_ID:
-                    await channel.send(content=f"<@&{PING_ROLE_ID}>", embed=embed)
-                else:
-                    await channel.send(embed=embed)
-
-                print("Scheduled notification sent")
-
-            # -----------------------------
             # ⛔ LIVE ENDED
             # -----------------------------
-            elif status == "offline" and live_video_id:
+            if not is_live and live_video_id:
                 link = f"https://youtube.com/watch?v={live_video_id}"
 
                 embed = discord.Embed(
                     title="⛔ 🔴 LIVE STREAM ENDED 🔴 ⛔",
-                    description="🎮 Stream has ended.\n🙏 Thanks for watching!",
+                    description="🎮 The battle has ended!\n🙏 Thanks for watching!",
                     color=0x2F3136,
                     url=link
                 )
 
                 embed.set_author(name="LK GAMING THENI")
+
                 embed.add_field(name="🛰 Status", value="🔴 OFFLINE", inline=False)
                 embed.add_field(name="📺 Watch Replay", value=f"[Click Here To Watch]({link})", inline=False)
 
