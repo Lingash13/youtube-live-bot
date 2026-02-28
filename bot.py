@@ -19,15 +19,33 @@ live_video_id = None
 
 
 # ------------------------------------------------
-# 🔴 CHECK LIVE USING REDIRECT METHOD (STABLE)
+# 🔴 LIVE CHECK (Railway Stable - With Headers)
 # ------------------------------------------------
 def check_if_live(channel_id):
     try:
         url = f"https://www.youtube.com/channel/{channel_id}/live"
-        r = requests.get(url, allow_redirects=True, timeout=10)
+
+        headers = {
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/120.0.0.0 Safari/537.36"
+            ),
+            "Accept-Language": "en-US,en;q=0.9"
+        }
+
+        r = requests.get(
+            url,
+            headers=headers,
+            allow_redirects=True,
+            timeout=10
+        )
+
+        print("Requested URL:", url)
+        print("Final URL:", r.url)
 
         if "/watch?v=" in r.url:
-            video_id = r.url.split("v=")[1]
+            video_id = r.url.split("v=")[1].split("&")[0]
             return True, video_id
 
         return False, None
@@ -56,7 +74,9 @@ async def check_youtube():
             # 🔴 LIVE CHECK
             # -----------------------------
             is_live, current_live_id = check_if_live(YOUTUBE_CHANNEL_ID)
+
             print("Is Live:", is_live)
+            print("Current Live ID:", current_live_id)
 
             # LIVE START
             if is_live and live_video_id != current_live_id:
@@ -114,8 +134,8 @@ async def check_youtube():
                 else:
                     await channel.send(embed=embed)
 
-                live_video_id = None
                 print("Live ended notification sent")
+                live_video_id = None
 
             # -----------------------------
             # 🎬 UPLOAD CHECK (RSS)
