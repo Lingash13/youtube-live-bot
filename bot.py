@@ -2,6 +2,7 @@ import discord
 import asyncio
 import os
 import requests
+import re
 
 TOKEN = os.getenv("DISCORD_TOKEN")
 YOUTUBE_CHANNEL_ID = os.getenv("YOUTUBE_CHANNEL_ID")
@@ -16,7 +17,7 @@ live_video_id = None
 
 def get_live_video(channel_id):
     try:
-        url = f"https://www.youtube.com/channel/{channel_id}/live"
+        url = f"https://www.youtube.com/channel/{channel_id}/videos"
 
         headers = {
             "User-Agent": "Mozilla/5.0",
@@ -24,14 +25,15 @@ def get_live_video(channel_id):
         }
 
         r = requests.get(url, headers=headers, timeout=10)
-
         html = r.text
 
-        if "isLiveNow\":true" in html:
-            start = html.find("/watch?v=")
-            if start != -1:
-                video_id = html[start+9:start+20]
-                return True, video_id
+        # Find live badge pattern
+        if "LIVE" in html:
+
+            match = re.search(r"watch\?v=([a-zA-Z0-9_-]{11})", html)
+
+            if match:
+                return True, match.group(1)
 
         return False, None
 
@@ -55,7 +57,6 @@ async def check_live():
 
             print("Is Live:", is_live)
 
-            # LIVE START
             if is_live and live_video_id != current_id:
                 live_video_id = current_id
                 link = f"https://youtube.com/watch?v={current_id}"
@@ -84,7 +85,6 @@ async def check_live():
 
                 print("Live notification sent")
 
-            # LIVE END
             if not is_live and live_video_id:
                 embed = discord.Embed(
                     title="⛔ 🔴 LIVE STREAM ENDED 🔴 ⛔",
@@ -119,4 +119,4 @@ async def on_ready():
     client.loop.create_task(check_live())
 
 
-client.run(TOKEN)
+client.run(TOKEN
