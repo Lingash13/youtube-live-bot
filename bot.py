@@ -102,7 +102,10 @@ async def check_live_stream():
 
                 embed.set_footer(text="Developed By Lingash, Powered by EazBy Studio")
 
-                await channel.send(embed=embed)
+                await channel.send(
+                content=f"<@&{MEMBER_ROLE_ID}> 🔥 LIVE NOW!",
+                embed=embed
+                )
                 print("✅ Live started embed sent")
 
         # ===============================
@@ -136,7 +139,10 @@ async def check_live_stream():
 
                 embed.set_footer(text="Developed By Lingash, Powered by EazBy Studio")
 
-                await channel.send(embed=embed)
+                await channel.send(
+                content=f"<@&{MEMBER_ROLE_ID}> 🔥 LIVE END!",
+                embed=embed
+                )
                 print("🔔 Live ended embed sent")
 
     except Exception as e:
