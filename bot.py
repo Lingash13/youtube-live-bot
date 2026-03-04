@@ -89,7 +89,7 @@ async def check_live_stream():
 
                 embed.set_image(url=thumbnail)
                 embed.add_field(name="📺 Watch Now", value=f"[Click Here]({url})", inline=False)
-                embed.set_footer(text="YouTube Live Alert Bot")
+                embed.set_footer(text="Developed By Lingash, Powered By VGS Studio")
 
                 await channel.send(embed=embed)
                 print("✅ Live notification sent")
@@ -97,11 +97,41 @@ async def check_live_stream():
         # ===============================
         # IF STREAM ENDED
         # ===============================
-        else:
-            if last_status == "live":
-                last_status = "ended"
-                await channel.send("📴 Live stream ended.")
-                print("🔔 Live ended message sent")
+        # ===============================
+# IF STREAM ENDED
+# ===============================
+else:
+    if last_status == "live":
+        last_status = "ended"
+
+        title = video_data["snippet"]["title"]
+        thumbnail = video_data["snippet"]["thumbnails"]["high"]["url"]
+        url = f"https://www.youtube.com/watch?v={video_id}"
+
+        embed = discord.Embed(
+            title="📴 🔴 LIVE STREAM ENDED 🔴",
+            description=(
+                f"🎮 **{title}**\n\n"
+                "🛑 The stream has officially ended.\n"
+                "💬 Thanks for joining the live session!\n\n"
+                "📺 Missed it?\n"
+                "👉 Watch the replay below!"
+            ),
+            color=discord.Color.dark_red()
+        )
+
+        embed.set_image(url=thumbnail)
+        embed.add_field(
+            name="🎥 Watch Replay",
+            value=f"[Click Here To Watch]({url})",
+            inline=False
+        )
+
+        embed.set_footer(text="Developed By Lingash, Powered By VGS Studio")
+
+        await channel.send(embed=embed)
+
+        print("🔔 Live ended embed sent")
 
     except Exception as e:
         print("❌ Error:", e)
