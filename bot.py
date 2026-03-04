@@ -11,6 +11,7 @@ DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
 CHANNEL_ID = os.getenv("CHANNEL_ID")
 DISCORD_CHANNEL_ID = int(os.getenv("DISCORD_CHANNEL_ID"))
+MEMBER_ROLE_ID = int(os.getenv("MEMBER_ROLE_ID"))
 
 # ===============================
 # DISCORD SETUP
